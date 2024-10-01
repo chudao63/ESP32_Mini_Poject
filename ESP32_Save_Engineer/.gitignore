@@ -1,0 +1,34 @@
+.pio
+.vscode/.browse.c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch
+# Thư mục build của PlatformIO
+/.pio
+
+# Thư mục chứa các libraries được tải xuống
+/.libdeps
+
+# Thông tin về môi trường PlatformIO
+/.vscode
+/.vscode/*
+
+# Tệp log của VSCode hoặc PlatformIO
+*.log
+
+# File tạm thời, lưu trữ hoặc file hệ thống
+.DS_Store
+Thumbs.db
+
+# Cấu hình cục bộ của PlatformIO
+platformio.ini.save
+platformio.ini.backup
+
+# Tệp cấu hình của các IDE khác nếu có (chẳng hạn Eclipse, CLion)
+.idea
+*.swp
+*.swo
+
+# Tệp binary và tệp firmware output
+firmware.bin
+firmware.elf
