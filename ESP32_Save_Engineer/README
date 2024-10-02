@@ -1,0 +1,70 @@
+
+### **1. Luồng hoạt động của chương trình:**
+
+Chương trình của bạn sử dụng **FreeRTOS** để quản lý các task chạy đồng thời (multitasking). Dưới đây là luồng hoạt động chính:
+
+- **`main.cpp`** khởi động hệ thống, tạo task FreeRTOS để đọc dữ liệu từ cảm biến ACS712.
+- Task được tạo ra sẽ chạy trong **`task_sensor.cpp`**, và trong vòng lặp vô hạn, nó liên tục đọc giá trị dòng điện từ cảm biến ACS712, sau đó in kết quả lên Serial Monitor.
+
+### **Luồng hoạt động chi tiết:**
+
+1. **Khởi tạo hệ thống trong `setup()` (main.cpp):**
+   - Trong `setup()`, bạn gọi `Serial.begin(115200)` để thiết lập tốc độ truyền Serial, cho phép in dữ liệu lên Serial Monitor.
+   - **Tạo task FreeRTOS:** `xTaskCreatePinnedToCore(task_sensor, "Task Sensor", 4096, NULL, 1, NULL, 1);` sẽ tạo một task mới tên là "Task Sensor". Task này sẽ chạy hàm `task_sensor(void*)`, được định nghĩa trong `task_sensor.cpp`.
+
+2. **Thực hiện task trong `task_sensor.cpp`:**
+   - Task được thực thi trong vòng lặp vô hạn (`while (1)`). Khi task được khởi tạo, nó sẽ:
+     - **Hiệu chuẩn cảm biến (`acs712.calibrate()`):** Hàm này lấy một số lượng mẫu (samples) từ cảm biến để xác định giá trị điện áp tương ứng với dòng điện bằng 0 (zeroCurrentOffset). Điều này giúp điều chỉnh các giá trị sau này chính xác hơn.
+     - **Đọc dòng điện (`acs712.readCurrent()`):** Trong vòng lặp, task đọc dữ liệu từ cảm biến ACS712 bằng cách sử dụng hàm `readCurrent()`. Dữ liệu này là dòng điện hiện tại chạy qua cảm biến.
+     - **In dữ liệu lên Serial Monitor (`Serial.print()`):** Kết quả dòng điện sẽ được in ra Serial Monitor dưới dạng số thực (float) với 4 chữ số thập phân.
+     - **Tạm dừng task (`vTaskDelay(1000 / portTICK_PERIOD_MS)`):** Task tạm dừng trong 1 giây (1000 ms) trước khi tiếp tục đọc dữ liệu.
+
+3. **FreeRTOS quản lý task:**
+   - Sau khi tạo task, FreeRTOS sẽ quản lý việc chạy task, thực hiện task song song với bất kỳ task nào khác mà bạn có thể thêm vào sau này. `loop()` không cần thực hiện gì cả vì tất cả logic được quản lý trong các task của FreeRTOS.
+
+### **Cách các file được liên kết và import lẫn nhau:**
+
+1. **`main.cpp`:**
+   - **Chức năng:** Chứa hàm `setup()` và `loop()`, đây là hai hàm chính của mọi chương trình Arduino. `setup()` được gọi một lần khi khởi động, còn `loop()` sẽ được gọi liên tục. Trong trường hợp này, `setup()` tạo ra một task FreeRTOS.
+   - **Import:** 
+     - `#include <Arduino.h>`: Bao gồm các hàm và thư viện cơ bản của Arduino.
+     - `#include "task_sensor.h"`: Bao gồm file header để có thể sử dụng hàm `task_sensor` trong `main.cpp`.
+
+2. **`task_sensor.h`:**
+   - **Chức năng:** Là file header, khai báo các hàm và biến mà chúng ta sẽ sử dụng ở các file khác. Các file khác cần bao gồm (`#include`) file này để có thể sử dụng `task_sensor()` và biến `acs712`.
+   - **Khai báo:** 
+     - `extern ACS712 acs712;` khai báo rằng biến `acs712` được định nghĩa ở nơi khác (cụ thể là trong `task_sensor.cpp`), và tất cả các file bao gồm `task_sensor.h` sẽ có thể sử dụng biến này mà không bị lỗi "multiple definition".
+     - `void task_sensor(void *pvParameters);` khai báo hàm `task_sensor` để nó có thể được gọi từ `main.cpp`.
+
+3. **`task_sensor.cpp`:**
+   - **Chức năng:** Đây là nơi bạn định nghĩa task của bạn. Task này đọc dữ liệu từ cảm biến ACS712 và in nó ra Serial Monitor.
+   - **Import:** 
+     - `#include "task_sensor.h"`: Bao gồm header để task này có thể sử dụng biến và hàm được khai báo trong `task_sensor.h`.
+   - **Định nghĩa:**
+     - `ACS712 acs712(35, 0.185, 3.3);` là nơi bạn khởi tạo đối tượng `acs712` để quản lý cảm biến.
+     - `void task_sensor(void *pvParameters)` định nghĩa logic của task. Trong đó, hàm này thực hiện việc hiệu chuẩn cảm biến và đọc dữ liệu từ cảm biến.
+
+4. **`ACS712.h` và `ACS712.cpp`:**
+   - **Chức năng:** Đây là file thư viện tự viết để quản lý cảm biến ACS712. 
+     - `ACS712.h` là file header chứa khai báo class `ACS712` với các phương thức như `calibrate()` và `readCurrent()`.
+     - `ACS712.cpp` là file định nghĩa chi tiết các phương thức của class `ACS712`.
+   - **Import:** 
+     - `#include "ACS712.h"` trong `task_sensor.h` và `task_sensor.cpp` cho phép các file khác sử dụng class `ACS712`.
+
+### **Sự tương tác giữa các file:**
+
+1. **`main.cpp` → `task_sensor.h`:**
+   - `main.cpp` bao gồm `task_sensor.h` để có thể gọi hàm `task_sensor`. Điều này giúp tách biệt logic chính và logic của các task.
+
+2. **`task_sensor.cpp` → `task_sensor.h`:**
+   - `task_sensor.cpp` bao gồm `task_sensor.h` để có thể sử dụng các khai báo chung, đồng thời đảm bảo rằng biến `acs712` không bị định nghĩa lại.
+
+3. **`task_sensor.h` → `ACS712.h`:**
+   - `task_sensor.h` bao gồm `ACS712.h` để khai báo class `ACS712` và sử dụng nó trong logic của task.
+
+### **Tóm tắt:**
+- Chương trình khởi tạo một task FreeRTOS trong `main.cpp`. Task này chạy liên tục và thực hiện việc đọc dữ liệu từ cảm biến ACS712.
+- Các file header (`.h`) chứa các khai báo hàm và biến, còn các file nguồn (`.cpp`) chứa định nghĩa chi tiết của chúng.
+- `task_sensor.h` và `ACS712.h` được sử dụng để chia sẻ thông tin giữa các file mà không cần định nghĩa lại.
+
+Nếu bạn có thêm bất kỳ câu hỏi nào về cách hoạt động của code, mình sẽ rất vui lòng giải thích thêm!
